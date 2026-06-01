@@ -11,17 +11,17 @@ gantt
     title Embedded CI/CD Architect Dev Roadmap
     dateFormat  YYYY-MM-DD
     section Phase 1: Contracts
-    Define Shared Interfaces       :active, p1, 2026-06-01, 1d
+    "Define Shared Interfaces"           :active, p1, 2026-06-01, 1d
     section Phase 2: Core Dev
-    Dev 1: Scanners & Parsers       :crit, p2_d1, after p1, 3d
-    Dev 2: Static Templates & Fallbacks :crit, p2_d2, after p1, 3d
-    Dev 3: VS Code Host & Menus     :crit, p2_d3, after p1, 3d
+    "Dev 1: Scanners & Parsers"          :crit, p2_d1, after p1, 3d
+    "Dev 2: Static Templates & Fallbacks" :crit, p2_d2, after p1, 3d
+    "Dev 3: VS Code Host & Menus"        :crit, p2_d3, after p1, 3d
     section Phase 3: Integration
-    Dev 3: Wire LangChain & Prompts :p3_d3, after p2_d3, 2d
-    Dev 2: Connect Generators       :p3_d2, after p2_d2, 2d
-    Dev 1: Refine & Parse Headers   :p3_d1, after p2_d1, 2d
+    "Dev 3: Wire LangChain & Prompts"    :p3_d3, after p2_d3, 2d
+    "Dev 2: Connect Generators"          :p3_d2, after p2_d2, 2d
+    "Dev 1: Refine & Parse Headers"      :p3_d1, after p2_d1, 2d
     section Phase 4: Testing & Polish
-    End-to-End Verification         :active, p4, after p3_d3, 1d
+    "End-to-End Verification"            :active, p4, after p3_d3, 1d
 ```
 
 ---
