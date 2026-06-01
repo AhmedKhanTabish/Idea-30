@@ -1,0 +1,247 @@
+Embedded CI/CD Pipeline Architect — VS Code Extension
+A VS Code extension that lets embedded developers right-click a project folder and generate a production-ready CI/CD pipeline (GitHub Actions or GitLab CI) tailored to their MCU project.
+
+Architecture Overview
+Core Engine (reusable library)
+VS Code Extension Host
+Right-Click Folder
+Project Scanner
+Project Profile
+AI Pipeline Generator(LangChain/JS + LLM)
+YAML Workflow File
+Write to .github/ or .gitlab-ci.yml
+Design Principles (Scalability)
+Separation of Concerns — The extension UI layer is thin; all logic lives in a standalone core/ engine that can be reused by a CLI tool, web app, or other IDE later.
+Strategy Pattern for Scanners — Each project type (PlatformIO, CMake, Arduino, ESP-IDF, Zephyr) is a pluggable scanner. Adding a new one means adding a single file — zero changes to existing code.
+Template + AI Hybrid — Static YAML templates handle the deterministic parts (caching, checkout, artifact upload). The LLM fills in project-specific logic (env names, build commands, test commands). This keeps output reliable while still being "smart."
+Provider Pattern for CI Targets — GitHub Actions and GitLab CI are separate "providers." Adding Bitbucket Pipelines, Azure DevOps, etc. later is one new file.
+User Review Required
+IMPORTANT
+
+LLM API Key: The extension will need an API key to call an LLM (OpenAI, Anthropic, or local Ollama). The plan includes a settings UI where the user configures their key. Do you have a preferred LLM provider? I'll default to supporting OpenAI + Ollama (free local option) with the architecture open to adding more.
+
+IMPORTANT
+
+Offline Fallback: If no LLM key is configured, the extension will use a pure-template mode (no AI reasoning, just deterministic YAML generation from detected config). This means it still works without any AI — just less "smart." Is this acceptable, or do you want AI to be mandatory?
+
+Open Questions
+LLM Provider Preference — OpenAI GPT-4o-mini is lightweight and cheap. Ollama is free and local. Should I wire up both as options? (Plan assumes yes.)
+Test Simulation — For PlatformIO projects this is straightforward (pio test). For raw CMake/ESP-IDF projects, test simulation varies wildly. Should the v1 just add a placeholder test stage with a comment, or attempt to detect Unity/GoogleTest? (Plan assumes placeholder with detection hook for v2.)
+Extension Publishing — Do you want me to set up the vsce packaging config so you can publish to the VS Code Marketplace later? (Plan assumes yes.)
+Proposed Changes
+The entire project lives in: e:\Rosenheim\Studies\Programming\Ideas\Idea 30\
+
+Project Structure
+embedded-cicd-architect/
+├── .vscode/                          # Dev workspace config
+│   ├── launch.json                   # F5 debugging
+│   └── tasks.json                    # Build tasks
+├── src/
+│   ├── extension.ts                  # VS Code entry point (activate/deactivate)
+│   ├── commands/
+│   │   └── generatePipeline.ts       # Command handler for right-click action
+│   ├── ui/
+│   │   └── quickPick.ts              # QuickPick UI for CI provider selection
+│   ├── core/                         # ★ Standalone engine (no VS Code deps)
+│   │   ├── scanner/
+│   │   │   ├── types.ts              # Scanner interfaces & ProjectProfile type
+│   │   │   ├── scannerRegistry.ts    # Registry that auto-discovers scanners
+│   │   │   ├── platformioScanner.ts  # Detects platformio.ini projects
+│   │   │   ├── cmakeScanner.ts       # Detects CMakeLists.txt projects
+│   │   │   ├── arduinoScanner.ts     # Detects .ino / Arduino projects
+│   │   │   └── espIdfScanner.ts      # Detects ESP-IDF (sdkconfig) projects
+│   │   ├── generator/
+│   │   │   ├── types.ts              # Generator interfaces
+│   │   │   ├── generatorFactory.ts   # Factory for CI provider generators
+│   │   │   ├── githubActionsGen.ts   # GitHub Actions YAML generator
+│   │   │   └── gitlabCiGen.ts        # GitLab CI YAML generator
+│   │   ├── ai/
+│   │   │   ├── types.ts              # AI provider interfaces
+│   │   │   ├── aiOrchestrator.ts     # LangChain agent orchestrator
+│   │   │   ├── prompts.ts            # System prompts & prompt templates
+│   │   │   └── templateFallback.ts   # Pure-template mode (no LLM needed)
+│   │   └── index.ts                  # Public API barrel export
+│   └── test/
+│       ├── suite/
+│       │   ├── scanner.test.ts       # Scanner unit tests
+│       │   └── generator.test.ts     # Generator unit tests
+│       └── runTest.ts                # VS Code test runner
+├── templates/                        # Static YAML snippets
+│   ├── github/
+│   │   ├── platformio.yml            # GitHub Actions template for PIO
+│   │   ├── cmake-stm32.yml           # GitHub Actions template for CMake STM32
+│   │   └── cmake-esp-idf.yml         # GitHub Actions template for ESP-IDF/CMake
+│   └── gitlab/
+│       ├── platformio.yml            # GitLab CI template for PIO
+│       ├── cmake-stm32.yml           # GitLab CI template for CMake STM32
+│       └── cmake-esp-idf.yml         # GitLab CI template for ESP-IDF/CMake
+├── package.json                      # Extension manifest
+├── tsconfig.json                     # TypeScript config
+├── .vscodeignore                     # Files to exclude from VSIX
+├── esbuild.js                        # Bundler config
+├── README.md                         # User-facing docs
+├── CONTRIBUTING.md                   # How to add scanners/generators
+└── ARCHITECTURE.md                   # Deep-dive into how the code works
+1. Extension Shell (VS Code Layer)
+[NEW] 
+package.json
+Extension manifest with contributes.commands and contributes.menus
+Right-click menu on folders via explorer/context (when clause: explorerResourceIsFolder)
+Configuration settings for LLM provider, API key, preferred CI platform
+Activation event: onCommand:embeddedCicd.generatePipeline
+[NEW] 
+extension.ts
+Registers the embeddedCicd.generatePipeline command
+Wires up disposables into context.subscriptions
+Thin — delegates immediately to commands/generatePipeline.ts
+[NEW] 
+generatePipeline.ts
+Receives folder URI from the context menu
+Shows QuickPick for CI provider selection (GitHub Actions / GitLab CI)
+Shows withProgress notification during scanning + generation
+Calls core engine, writes result to disk, opens generated file in editor
+[NEW] 
+quickPick.ts
+Reusable QuickPick helpers for selecting CI provider, confirming overwrite, etc.
+2. Project Scanner (Detection Engine)
+[NEW] 
+types.ts
+typescript
+// Key interfaces — this is the contract all scanners implement
+export interface ProjectProfile {
+  projectType: 'platformio' | 'cmake' | 'arduino' | 'esp-idf' | 'zephyr' | 'unknown';
+  platform: string;           // e.g., 'espressif32', 'ststm32', 'atmelavr'
+  board: string;              // e.g., 'esp32dev', 'nucleo_f446ze'
+  framework: string;          // e.g., 'arduino', 'espidf', 'stm32cube'
+  environments: string[];     // Multi-env support from platformio.ini
+  libraries: string[];        // Detected library dependencies
+  testFramework?: string;     // 'unity', 'googletest', 'none'
+  buildSystem: string;        // 'pio', 'cmake', 'make', 'idf.py'
+  sourceFiles: string[];      // Detected .c/.cpp/.ino files
+  extraConfig: Record<string, any>; // Extensible metadata
+}
+export interface IProjectScanner {
+  readonly name: string;
+  readonly priority: number;   // Higher = checked first
+  canScan(folderPath: string): Promise<boolean>;
+  scan(folderPath: string): Promise<ProjectProfile>;
+}
+[NEW] 
+scannerRegistry.ts
+Maintains ordered list of scanners by priority
+register(scanner) / scanProject(folderPath) — tries each scanner, returns first match
+Scalability: New scanners just call registry.register(new ZephyrScanner())
+[NEW] 
+platformioScanner.ts
+Checks for platformio.ini existence
+Parses INI format to extract [env:*] sections
+Extracts platform, board, framework, lib_deps, test_framework
+Returns fully populated ProjectProfile
+[NEW] 
+cmakeScanner.ts
+Checks for CMakeLists.txt
+Regex-based parsing for project(), target_link_libraries, toolchain file references
+Detects STM32 via arm-none-eabi toolchain references
+Detects ESP-IDF via idf_component_register or $ENV{IDF_PATH}
+[NEW] 
+arduinoScanner.ts
+Checks for .ino files
+Scans #include statements for board-specific libraries (ESP8266WiFi, STM32, etc.)
+Detects board from boards.txt or arduino.json if present
+[NEW] 
+espIdfScanner.ts
+Checks for sdkconfig or sdkconfig.defaults
+Parses CONFIG_IDF_TARGET to determine chip (esp32, esp32s2, esp32s3, esp32c3, etc.)
+Detects component structure (components/ dir, idf_component.yml)
+3. AI Pipeline Generator
+[NEW] 
+prompts.ts
+System prompt explaining CI/CD best practices for embedded
+Template with {projectProfile} placeholder
+Few-shot examples of good pipeline YAML for each project type
+[NEW] 
+aiOrchestrator.ts
+Uses LangChain.js ChatOpenAI or ChatOllama
+Sends project profile + system prompt → receives structured YAML
+Validates output is parseable YAML before returning
+Falls back to templateFallback.ts on AI failure
+[NEW] 
+templateFallback.ts
+Pure deterministic YAML generation from templates
+Loads templates from templates/ directory
+Performs variable substitution ({{board}}, {{environments}}, {{framework}})
+No LLM dependency — always works offline
+4. CI Provider Generators
+[NEW] 
+generatorFactory.ts
+Factory method: createGenerator('github' | 'gitlab') → ICiGenerator
+[NEW] 
+githubActionsGen.ts
+Generates .github/workflows/embedded-ci.yml
+Handles: checkout, cache, toolchain install, build matrix, artifact upload
+Supports PlatformIO (pio run), CMake (cmake --build), ESP-IDF (idf.py build)
+[NEW] 
+gitlabCiGen.ts
+Generates .gitlab-ci.yml
+Handles: Docker images, stages, script blocks, artifact paths
+Same project type support as GitHub Actions
+5. Static YAML Templates
+[NEW] templates/github/.yml & templates/gitlab/.yml
+Handcrafted, best-practice YAML templates for each combo:
+PlatformIO (multi-env matrix build)
+CMake + ARM GCC (STM32)
+CMake + ESP-IDF
+Use {{variable}} placeholders for project-specific values
+Include inline comments explaining each step (educational value)
+6. Documentation
+[NEW] 
+ARCHITECTURE.md
+Full deep-dive: data flow, scanner lifecycle, AI chain, generator pipeline
+Mermaid diagrams for each subsystem
+"How to add a new scanner" tutorial
+"How to add a new CI provider" tutorial
+[NEW] 
+CONTRIBUTING.md
+Step-by-step guide for adding new scanners and generators
+Code style and testing requirements
+[NEW] 
+README.md
+Feature overview, screenshots, installation, configuration
+Quick start guide
+Build Order
+The files will be created in dependency order so each layer builds on the previous:
+
+Phase	Files	Purpose
+1	package.json, tsconfig.json, esbuild.js, .vscodeignore	Project scaffold
+2	src/core/scanner/types.ts	Core interfaces
+3	src/core/scanner/scannerRegistry.ts	Scanner infrastructure
+4	src/core/scanner/platformioScanner.ts, cmakeScanner.ts, arduinoScanner.ts, espIdfScanner.ts	All scanners
+5	src/core/generator/types.ts, generatorFactory.ts	Generator interfaces
+6	templates/**/*.yml	Static YAML templates
+7	src/core/ai/prompts.ts, templateFallback.ts	Template engine
+8	src/core/ai/aiOrchestrator.ts	AI layer
+9	src/core/generator/githubActionsGen.ts, gitlabCiGen.ts	CI generators
+10	src/core/index.ts	Public API
+11	src/ui/quickPick.ts, src/commands/generatePipeline.ts	VS Code UI
+12	src/extension.ts	Entry point
+13	.vscode/launch.json, .vscode/tasks.json	Dev tooling
+14	Tests, docs	Quality & learning
+Verification Plan
+Automated Tests
+bash
+# Compile the extension
+npm run compile
+# Run unit tests for scanners (mock file system)
+npm test
+# Package the extension
+npx vsce package
+Manual Verification
+Press F5 in VS Code to launch Extension Development Host
+Open a sample PlatformIO project folder
+Right-click the folder → "Generate CI/CD Pipeline"
+Select "GitHub Actions" from QuickPick
+Verify .github/workflows/embedded-ci.yml is created with correct content
+Repeat with a CMake-based STM32 project and GitLab CI selection
+Browser-Based Validation
+Open generated YAML files and validate structure
+Check that variable substitution worked correctly
