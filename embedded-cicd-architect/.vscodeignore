@@ -1,0 +1,21 @@
+# Source code (bundled into dist/)
+src/**
+out/**
+
+# Config files
+.vscode/**
+.vscode-test/**
+tsconfig.json
+esbuild.js
+.eslintrc.json
+
+# Development files
+node_modules/**
+*.map
+**/*.ts
+!dist/**
+
+# Documentation (not needed in VSIX)
+CONTRIBUTING.md
+ARCHITECTURE.md
+.gitignore

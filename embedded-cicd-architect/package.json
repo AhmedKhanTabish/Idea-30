@@ -1,0 +1,122 @@
+{
+  "name": "embedded-cicd-architect",
+  "displayName": "Embedded CI/CD Pipeline Architect",
+  "description": "Right-click any embedded project folder to auto-generate GitHub Actions or GitLab CI pipelines for cross-compilation, linting, and testing.",
+  "version": "0.1.0",
+  "publisher": "zaint",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "embedded",
+    "CI/CD",
+    "GitHub Actions",
+    "GitLab CI",
+    "PlatformIO",
+    "ESP32",
+    "STM32",
+    "Arduino",
+    "cross-compilation"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "embeddedCicd.generatePipeline",
+        "title": "Generate CI/CD Pipeline",
+        "category": "Embedded CI/CD"
+      }
+    ],
+    "menus": {
+      "explorer/context": [
+        {
+          "command": "embeddedCicd.generatePipeline",
+          "when": "explorerResourceIsFolder",
+          "group": "7_embedded@1"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "embeddedCicd.generatePipeline",
+          "when": "workspaceFolderCount > 0"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Embedded CI/CD Architect",
+      "properties": {
+        "embeddedCicd.llmProvider": {
+          "type": "string",
+          "enum": [
+            "openai",
+            "ollama",
+            "none"
+          ],
+          "default": "none",
+          "description": "LLM provider for AI-powered pipeline generation. Set to 'none' for pure template mode (no API key required)."
+        },
+        "embeddedCicd.openaiApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "OpenAI API key (required when llmProvider is 'openai')."
+        },
+        "embeddedCicd.openaiModel": {
+          "type": "string",
+          "default": "gpt-4o-mini",
+          "description": "OpenAI model to use for pipeline generation."
+        },
+        "embeddedCicd.ollamaBaseUrl": {
+          "type": "string",
+          "default": "http://localhost:11434",
+          "description": "Ollama server URL (required when llmProvider is 'ollama')."
+        },
+        "embeddedCicd.ollamaModel": {
+          "type": "string",
+          "default": "llama3",
+          "description": "Ollama model to use for pipeline generation."
+        },
+        "embeddedCicd.defaultCiProvider": {
+          "type": "string",
+          "enum": [
+            "ask",
+            "github",
+            "gitlab"
+          ],
+          "default": "ask",
+          "description": "Default CI provider. Set to 'ask' to be prompted each time."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run package",
+    "compile": "node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "package": "node esbuild.js --production",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "esbuild": "^0.20.0",
+    "eslint": "^8.56.0",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "@langchain/community": "^0.3.0",
+    "@langchain/core": "^0.3.0",
+    "@langchain/openai": "^0.3.0",
+    "ini": "^4.1.0",
+    "js-yaml": "^4.1.0",
+    "langchain": "^0.3.0"
+  }
+}
